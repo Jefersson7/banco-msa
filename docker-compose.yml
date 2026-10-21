@@ -1,22 +1,22 @@
 name: banco-msa
 
 # Entorno de desarrollo: una base de datos por microservicio.
-# Los dos microservicios se agregan a este archivo en la iteracion F7.
+# Los dos microservicios se agregan a este archivo en la iteración F7.
 services:
 
   postgres-clientes:
     image: postgres:16-alpine
     container_name: banco-postgres-clientes
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-banco}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-banco}
-      POSTGRES_DB: ${POSTGRES_DB_CLIENTES:-clientes_db}
+      POSTGRES_USER: ${DB_USER:-banco}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-banco}
+      POSTGRES_DB: ${DB_CLIENTES_NAME:-clientes_db}
     ports:
-      - "${POSTGRES_CLIENTES_PORT:-5433}:5432"
+      - "${DB_CLIENTES_PORT:-5433}:5432"
     volumes:
       - pgdata-clientes:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-banco} -d ${POSTGRES_DB_CLIENTES:-clientes_db}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-banco} -d ${DB_CLIENTES_NAME:-clientes_db}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -27,15 +27,15 @@ services:
     image: postgres:16-alpine
     container_name: banco-postgres-cuentas
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-banco}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-banco}
-      POSTGRES_DB: ${POSTGRES_DB_CUENTAS:-cuentas_db}
+      POSTGRES_USER: ${DB_USER:-banco}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-banco}
+      POSTGRES_DB: ${DB_CUENTAS_NAME:-cuentas_db}
     ports:
-      - "${POSTGRES_CUENTAS_PORT:-5434}:5432"
+      - "${DB_CUENTAS_PORT:-5434}:5432"
     volumes:
       - pgdata-cuentas:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-banco} -d ${POSTGRES_DB_CUENTAS:-cuentas_db}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-banco} -d ${DB_CUENTAS_NAME:-cuentas_db}"]
       interval: 5s
       timeout: 5s
       retries: 10
