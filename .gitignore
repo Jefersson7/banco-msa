@@ -1,0 +1,23 @@
+# Secretos: el .env real nunca se versiona, solo el .env.example
+.env
+!.env.example
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+nbproject/private/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs y artefactos sueltos
+*.log
+logs/
