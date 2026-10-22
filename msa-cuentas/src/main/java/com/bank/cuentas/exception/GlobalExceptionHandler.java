@@ -58,6 +58,19 @@ public class GlobalExceptionHandler {
 		return problem;
 	}
 
+	/**
+	 * Egreso sin saldo suficiente: la peticion es valida pero el estado de la
+	 * cuenta impide procesarla. Se devuelve el mensaje exacto de la regla.
+	 */
+	@ExceptionHandler(SaldoNoDisponibleException.class)
+	public ProblemDetail handleSaldoNoDisponible(SaldoNoDisponibleException ex) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_CONTENT,
+				ex.getMessage());
+		problem.setTitle("Saldo insuficiente");
+		problem.setProperty("code", "SALDO_NO_DISPONIBLE");
+		return problem;
+	}
+
 	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
 	public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
