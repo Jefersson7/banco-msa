@@ -15,6 +15,8 @@ import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
+import com.bank.cuentas.exception.SaldoNoDisponibleException;
+
 /**
  * Cuenta de un cliente. Los datos del cliente (clientId, nombreCliente,
  * identificacion) son una copia: msa-cuentas no consulta la base de msa-clientes.
@@ -124,11 +126,17 @@ public class Cuenta {
 
 	/**
 	 * Aplica un movimiento con signo al saldo disponible y devuelve el saldo
-	 * resultante. Es el unico camino para modificar el saldo. En F3 esta
-	 * operacion rechazara los egresos sin saldo.
+	 * resultante. Es el unico camino para modificar el saldo. Un egreso que
+	 * dejaria el saldo por debajo de cero se rechaza con
+	 * {@link SaldoNoDisponibleException}; si se rechaza, el saldo no cambia.
+	 * Un saldo resultante de cero es valido.
 	 */
 	public BigDecimal aplicarMovimiento(BigDecimal valor) {
-		this.saldoActual = this.saldoActual.add(valor);
+		BigDecimal saldoResultante = this.saldoActual.add(valor);
+		if (valor.signum() < 0 && saldoResultante.signum() < 0) {
+			throw new SaldoNoDisponibleException();
+		}
+		this.saldoActual = saldoResultante;
 		return this.saldoActual;
 	}
 

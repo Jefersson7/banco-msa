@@ -340,6 +340,39 @@
 					]
 				},
 				{
+					"name": "Movimiento sin saldo (egreso)",
+					"description": "Un egreso que dejaria el saldo por debajo de cero devuelve 422 SALDO_NO_DISPONIBLE con el detalle \"Saldo no disponible\" y no altera el saldo. La cuenta indicada debe tener saldo menor al egreso.",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"cuenta\": \"{{numeroCuenta}}\",\n  \"tipoMovimiento\": \"EGRESO\",\n  \"valor\": -999999.00,\n  \"referencia\": \"SIN-SALDO-001\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{base_cuentas}}/movimientos",
+							"host": ["{{base_cuentas}}"],
+							"path": ["movimientos"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('422 Unprocessable Content', function () { pm.response.to.have.status(422); });",
+									"var body = pm.response.json();",
+									"pm.test('title Saldo insuficiente', function () { pm.expect(body.title).to.eql('Saldo insuficiente'); });",
+									"pm.test('detail Saldo no disponible', function () { pm.expect(body.detail).to.eql('Saldo no disponible'); });",
+									"pm.test('codigo SALDO_NO_DISPONIBLE', function () { pm.expect(body.code).to.eql('SALDO_NO_DISPONIBLE'); });"
+								]
+							}
+						}
+					]
+				},
+				{
 					"name": "Movimiento invalido (tipo y signo)",
 					"description": "Un INGRESO exige valor positivo: un valor negativo devuelve 400 TIPO_MOVIMIENTO_INVALIDO y no altera el saldo.",
 					"request": {
