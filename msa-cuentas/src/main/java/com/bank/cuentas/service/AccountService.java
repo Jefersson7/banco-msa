@@ -1,7 +1,5 @@
 package com.bank.cuentas.service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
@@ -39,15 +37,8 @@ public class AccountService {
 		// siga activo antes de abrirle una cuenta.
 		clientGateway.verificarClienteActivo(request.clienteId());
 
-		Cuenta cuenta = new Cuenta();
-		cuenta.setTipoCuenta(request.tipoCuenta());
-		BigDecimal saldoInicial = request.saldoInicial().setScale(2, RoundingMode.HALF_UP);
-		cuenta.setSaldoInicial(saldoInicial);
-		cuenta.setSaldoActual(saldoInicial);
-		cuenta.setEstado(EstadoCuenta.ACTIVA);
-		cuenta.setClienteId(request.clienteId());
-		cuenta.setNombreCliente(request.nombreCliente());
-		cuenta.setIdentificacion(request.identificacion());
+		Cuenta cuenta = Cuenta.abrir(request.tipoCuenta(), request.saldoInicial(), request.clienteId(),
+				request.nombreCliente(), request.identificacion());
 		return AccountResponse.from(accountRepository.save(cuenta));
 	}
 
@@ -70,9 +61,8 @@ public class AccountService {
 	@Transactional
 	public AccountResponse update(String accountNumber, UpdateAccountRequest request) {
 		Cuenta cuenta = findExistingAccount(accountNumber);
-		cuenta.setTipoCuenta(request.tipoCuenta());
-		cuenta.setEstado(request.estado());
-		return AccountResponse.from(accountRepository.save(cuenta));
+		cuenta.actualizar(request.tipoCuenta(), request.estado());
+		return AccountResponse.from(cuenta);
 	}
 
 	/**
@@ -86,13 +76,8 @@ public class AccountService {
 					"No se indico ningun campo a actualizar", HttpStatus.BAD_REQUEST);
 		}
 		Cuenta cuenta = findExistingAccount(accountNumber);
-		if (request.tipoCuenta() != null) {
-			cuenta.setTipoCuenta(request.tipoCuenta());
-		}
-		if (request.estado() != null) {
-			cuenta.setEstado(request.estado());
-		}
-		return AccountResponse.from(accountRepository.save(cuenta));
+		cuenta.actualizarParcialmente(request.tipoCuenta(), request.estado());
+		return AccountResponse.from(cuenta);
 	}
 
 	/**
@@ -111,9 +96,8 @@ public class AccountService {
 		}
 		List<Cuenta> cuentas = accountRepository.findByClientIdAndStatus(clientId, EstadoCuenta.ACTIVA);
 		for (Cuenta cuenta : cuentas) {
-			cuenta.setEstado(request.estado());
+			cuenta.cambiarEstado(request.estado());
 		}
-		accountRepository.saveAll(cuentas);
 		return new AccountsUpdatedResponse(clientId, cuentas.size(),
 				cuentas.stream().map(Cuenta::getNumeroCuenta).toList());
 	}

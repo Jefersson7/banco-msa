@@ -140,7 +140,7 @@ requieren Docker activo.
 | PUT | `/cuentas/{accountNumber}` | Actualiza el tipo y el estado de la cuenta, no el saldo |
 | PATCH | `/cuentas/{accountNumber}` | Actualiza parcialmente la cuenta: solo el tipo y/o el estado que lleguen en el cuerpo |
 | PATCH | `/cuentas?clienteId=...` | Actualiza en bloque el estado de las cuentas activas de un cliente. Lo consume msa-clientes al dar de baja al cliente |
-| POST | `/movimientos` | Registra un movimiento en una cuenta. El signo del valor define el tipo: positivo es ingreso, negativo es egreso |
+| POST | `/movimientos` | Registra un movimiento y actualiza el saldo de la cuenta. Solo cuentas en estado `ACTIVA`; `tipoMovimiento` (`INGRESO`/`EGRESO`) debe concordar con el signo del `valor`, que no puede ser cero |
 | GET | `/movimientos` | Lista paginada de movimientos. Filtro opcional por `cuenta` |
 | GET | `/movimientos/{id}` | Consulta un movimiento |
 | PUT | `/movimientos/{id}` | Actualiza la fecha y la referencia del movimiento |

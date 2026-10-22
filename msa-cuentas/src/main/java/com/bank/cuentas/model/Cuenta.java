@@ -1,6 +1,7 @@
 package com.bank.cuentas.model;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -12,10 +13,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 /**
  * Cuenta de un cliente. Los datos del cliente (clientId, nombreCliente,
  * identificacion) son una copia: msa-cuentas no consulta la base de msa-clientes.
+ *
+ * La entidad es duena de sus datos: se crea con {@link #abrir} y solo cambia a
+ * traves de operaciones de negocio. No tiene setters.
  */
 @Entity
 @Table(name = "cuenta")
@@ -25,6 +30,13 @@ public class Cuenta {
 	@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "cuenta_seq")
 	@SequenceGenerator(name = "cuenta_seq", sequenceName = "cuenta_id_seq", allocationSize = 1)
 	private Long id;
+
+	/**
+	 * Bloqueo optimista: dos movimientos concurrentes sobre la misma cuenta no
+	 * pueden pisarse la actualizacion del saldo.
+	 */
+	@Version
+	private Long version;
 
 	@Column(name = "numero_cuenta", nullable = false, unique = true, length = 20)
 	private String numeroCuenta;
@@ -53,6 +65,74 @@ public class Cuenta {
 	private String identificacion;
 
 	/**
+	 * Constructor de JPA: la entidad se instancia vacia y la base de datos carga
+	 * sus datos.
+	 */
+	protected Cuenta() {
+	}
+
+	/**
+	 * Alta de cuenta: nace activa y con el saldo actual igual al inicial.
+	 */
+	public static Cuenta abrir(TipoCuenta tipoCuenta, BigDecimal saldoInicial, String clienteId,
+			String nombreCliente, String identificacion) {
+		Cuenta cuenta = new Cuenta();
+		cuenta.tipoCuenta = tipoCuenta;
+		cuenta.saldoInicial = saldoInicial.setScale(2, RoundingMode.HALF_UP);
+		cuenta.saldoActual = cuenta.saldoInicial;
+		cuenta.estado = EstadoCuenta.ACTIVA;
+		cuenta.clienteId = clienteId;
+		cuenta.nombreCliente = nombreCliente;
+		cuenta.identificacion = identificacion;
+		return cuenta;
+	}
+
+	/**
+	 * Actualizacion completa (PUT): reemplaza el tipo y el estado.
+	 */
+	public void actualizar(TipoCuenta tipoCuenta, EstadoCuenta estado) {
+		this.tipoCuenta = tipoCuenta;
+		this.estado = estado;
+	}
+
+	/**
+	 * Actualizacion parcial (PATCH): solo aplica los campos que llegan. Un null
+	 * deja intacto el valor actual.
+	 */
+	public void actualizarParcialmente(TipoCuenta tipoCuenta, EstadoCuenta estado) {
+		if (tipoCuenta != null) {
+			this.tipoCuenta = tipoCuenta;
+		}
+		if (estado != null) {
+			this.estado = estado;
+		}
+	}
+
+	/**
+	 * Cambia el estado de la cuenta (baja masiva de un cliente).
+	 */
+	public void cambiarEstado(EstadoCuenta estado) {
+		this.estado = estado;
+	}
+
+	/**
+	 * Indica si la cuenta admite movimientos: solo las cuentas ACTIVA.
+	 */
+	public boolean estaActiva() {
+		return this.estado == EstadoCuenta.ACTIVA;
+	}
+
+	/**
+	 * Aplica un movimiento con signo al saldo disponible y devuelve el saldo
+	 * resultante. Es el unico camino para modificar el saldo. En F3 esta
+	 * operacion rechazara los egresos sin saldo.
+	 */
+	public BigDecimal aplicarMovimiento(BigDecimal valor) {
+		this.saldoActual = this.saldoActual.add(valor);
+		return this.saldoActual;
+	}
+
+	/**
 	 * El numero de cuenta se deriva del id de la secuencia: 10 digitos.
 	 */
 	@PrePersist
@@ -66,72 +146,36 @@ public class Cuenta {
 		return id;
 	}
 
-	public void setId(Long id) {
-		this.id = id;
-	}
-
 	public String getNumeroCuenta() {
 		return numeroCuenta;
-	}
-
-	public void setNumeroCuenta(String numeroCuenta) {
-		this.numeroCuenta = numeroCuenta;
 	}
 
 	public TipoCuenta getTipoCuenta() {
 		return tipoCuenta;
 	}
 
-	public void setTipoCuenta(TipoCuenta tipoCuenta) {
-		this.tipoCuenta = tipoCuenta;
-	}
-
 	public BigDecimal getSaldoInicial() {
 		return saldoInicial;
-	}
-
-	public void setSaldoInicial(BigDecimal saldoInicial) {
-		this.saldoInicial = saldoInicial;
 	}
 
 	public BigDecimal getSaldoActual() {
 		return saldoActual;
 	}
 
-	public void setSaldoActual(BigDecimal saldoActual) {
-		this.saldoActual = saldoActual;
-	}
-
 	public EstadoCuenta getEstado() {
 		return estado;
-	}
-
-	public void setEstado(EstadoCuenta estado) {
-		this.estado = estado;
 	}
 
 	public String getClienteId() {
 		return clienteId;
 	}
 
-	public void setClienteId(String clienteId) {
-		this.clienteId = clienteId;
-	}
-
 	public String getNombreCliente() {
 		return nombreCliente;
 	}
 
-	public void setNombreCliente(String nombreCliente) {
-		this.nombreCliente = nombreCliente;
-	}
-
 	public String getIdentificacion() {
 		return identificacion;
-	}
-
-	public void setIdentificacion(String identificacion) {
-		this.identificacion = identificacion;
 	}
 
 }
