@@ -331,6 +331,34 @@
 					}
 				},
 				{
+					"name": "Reporte estado de cuenta",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_cuentas}}/reportes?cliente={{clientId}}&fechaInicio=2000-01-01&fechaFin=2100-01-01",
+							"host": ["{{base_cuentas}}"],
+							"path": ["reportes"],
+							"query": [
+								{ "key": "cliente", "value": "{{clientId}}" },
+								{ "key": "fechaInicio", "value": "2000-01-01" },
+								{ "key": "fechaFin", "value": "2100-01-01" }
+							]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+									"pm.test('tiene cuentas del cliente', function () { pm.expect(pm.response.json().cuentas.length).to.be.above(0); });"
+								]
+							}
+						}
+					]
+				},
+				{
 					"name": "Escenarios de estado",
 					"item": [
 						{
