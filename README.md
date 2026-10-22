@@ -32,6 +32,7 @@ repositorio, que comparten Docker Compose y los dos microservicios.
 | `DB_CUENTAS_HOST` / `_PORT` / `_NAME` | Dónde está la base de datos de `msa-cuentas` |
 | `CLIENTES_PORT` / `CUENTAS_PORT` | Puertos publicados de los microservicios |
 | `CUENTAS_BASE_URL` | URL de `msa-cuentas` vista desde `msa-clientes` |
+| `CLIENTES_BASE_URL` | URL de `msa-clientes` vista desde `msa-cuentas` |
 
 Los microservicios importan el `.env` con `spring.config.import` (soporte nativo de archivos
 `.env` desde Spring Boot 3.4), de forma que cambiar una credencial en el `.env` afecta por igual a
@@ -68,6 +69,21 @@ docker compose up -d
 docker compose ps           # ambos Postgres deben quedar "healthy"
 ```
 
+Para empezar de cero, borrando también los volúmenes y con ello los datos:
+
+```bash
+docker compose down -v      # elimina contenedores, red y volúmenes
+docker compose up -d        # recrea las bases de datos vacías
+```
+
+No hace falta ningún script de inicialización: las tablas las crea Hibernate (`ddl-auto: update`)
+al arrancar cada microservicio.
+
+> Si la base de datos de clientes ya existía con el esquema anterior (una sola tabla `cliente`),
+> hay que resetear los volúmenes: `docker compose down -v && docker compose up -d`. Con la
+> herencia `JOINED` el esquema ahora son dos tablas (`persona` y `cliente`) y `ddl-auto: update`
+> no borra las columnas que quedan sin uso.
+
 ### 2. Levantar los microservicios
 
 ```bash
@@ -88,6 +104,9 @@ curl http://localhost:8081/actuator/health
 curl http://localhost:8082/actuator/health
 ```
 
+Para recorrer la API, importa `banco.postman_collection.json` en Postman: la colección encadena
+las peticiones y guarda el `clientId` y el `numeroCuenta` devueltos en las variables.
+
 ## Pruebas
 
 ```bash
@@ -100,18 +119,59 @@ requieren Docker activo.
 
 ## Endpoints
 
-> Se completa en la iteración F1.
+### msa-clientes (`http://localhost:8081`)
 
-## Decisiones y limitaciones
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/clientes` | Crea un cliente. Abre asíncronamente su cuenta corriente en msa-cuentas |
+| GET | `/clientes` | Lista paginada de clientes (`page`, `size`) |
+| GET | `/clientes/{clientId}` | Consulta un cliente por su identificador único |
+| PUT | `/clientes/{clientId}` | Actualiza todos los datos del cliente |
+| PATCH | `/clientes/{clientId}` | Actualiza parcialmente los datos del cliente |
+| DELETE | `/clientes/{clientId}` | Da de baja al cliente (baja lógica: pasa a `INACTIVO`) y desactiva asíncronamente sus cuentas |
 
-> Se completa al final de la entrega.
+### msa-cuentas (`http://localhost:8082`)
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/cuentas` | Crea una cuenta para un cliente. Verifica en msa-clientes que el cliente exista y esté activo. También es el endpoint que consume msa-clientes |
+| GET | `/cuentas` | Lista paginada de cuentas. Filtro opcional por `clienteId` |
+| GET | `/cuentas/{accountNumber}` | Consulta una cuenta por su número |
+| PUT | `/cuentas/{accountNumber}` | Actualiza el tipo y el estado de la cuenta, no el saldo |
+| PATCH | `/cuentas/{accountNumber}` | Actualiza parcialmente la cuenta: solo el tipo y/o el estado que lleguen en el cuerpo |
+| PATCH | `/cuentas?clienteId=...` | Actualiza en bloque el estado de las cuentas activas de un cliente. Lo consume msa-clientes al dar de baja al cliente |
+| POST | `/movimientos` | Registra un movimiento en una cuenta. El signo del valor define el tipo: positivo es ingreso, negativo es egreso |
+| GET | `/movimientos` | Lista paginada de movimientos. Filtro opcional por `cuenta` |
+| GET | `/movimientos/{id}` | Consulta un movimiento |
+| PUT | `/movimientos/{id}` | Actualiza la fecha y la referencia del movimiento |
+
+Los errores de negocio y de validación se devuelven como `ProblemDetail` (RFC 7807) con el
+código de negocio en el campo `code`.
 
 ## Estructura
 
 ```
 banco-msa/
-├── docker-compose.yml      # una base de datos por microservicio
-├── .env.example            # credenciales de ejemplo (el .env real no se versiona)
-├── msa-clientes/           # com.bank.clientes
-└── msa-cuentas/            # com.bank.cuentas
+├── docker-compose.yml           # una base de datos por microservicio
+├── .env.example                 # credenciales de ejemplo (el .env real no se versiona)
+├── banco.postman_collection.json
+├── msa-clientes/                # com.bank.clientes
+│   └── src/main/java/com/bank/clientes/
+│       ├── model/               # Persona, Cliente, DatosPersona, EstadoCliente
+│       ├── repository/          # ClientRepository
+│       ├── dto/                 # request y response
+│       ├── service/             # ClientService
+│       ├── controller/          # ClientController
+│       ├── exception/           # BusinessRuleException, GlobalExceptionHandler
+│       ├── security/            # PasswordHasher (BCrypt)
+│       ├── notification/         # AccountNotifier (cliente HTTP asíncrono)
+│       └── event/               # ClientRegisteredEvent, ClientDeactivatedEvent y sus listeners
+└── msa-cuentas/                 # com.bank.cuentas
+    └── src/main/java/com/bank/cuentas/
+        ├── model/               # Cuenta, Movimiento, TipoCuenta, EstadoCuenta
+        ├── repository/          # AccountRepository, MovementRepository
+        ├── dto/                 # request y response
+        ├── service/             # AccountService, MovementService
+        ├── controller/          # AccountController, MovementController
+        └── exception/           # BusinessRuleException, GlobalExceptionHandler
 ```

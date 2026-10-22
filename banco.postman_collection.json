@@ -1,0 +1,382 @@
+{
+	"info": {
+		"_postman_id": "b5a0f3c2-7d41-4e8a-9c6b-2f0a1d4e8b71",
+		"name": "banco-msa",
+		"description": "API de la prueba tecnica Arquitectura Microservicio. msa-clientes (8081) y msa-cuentas (8082).",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{ "key": "base_clientes", "value": "http://localhost:8081" },
+		{ "key": "base_cuentas", "value": "http://localhost:8082" },
+		{ "key": "clientId", "value": "" },
+		{ "key": "numeroCuenta", "value": "" },
+		{ "key": "movimientoId", "value": "" }
+	],
+	"item": [
+		{
+			"name": "msa-clientes",
+			"item": [
+				{
+					"name": "Crear cliente",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nombre\": \"Ana Perez\",\n  \"genero\": \"FEMENINO\",\n  \"edad\": 30,\n  \"identificacion\": \"1020304050\",\n  \"direccion\": \"Calle 45 #12-30\",\n  \"telefono\": \"3105550001\",\n  \"password\": \"secreta123\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{base_clientes}}/clientes",
+							"host": ["{{base_clientes}}"],
+							"path": ["clientes"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('201 Created', function () { pm.response.to.have.status(201); });",
+									"pm.test('devuelve clientId', function () {",
+									"    var body = pm.response.json();",
+									"    pm.expect(body.clientId).to.be.a('string');",
+									"    pm.collectionVariables.set('clientId', body.clientId);",
+									"});",
+									"pm.test('no devuelve la contrasena', function () {",
+									"    pm.expect(pm.response.text()).to.not.include('secreta123');",
+									"});",
+									"pm.test('devuelve genero y edad', function () {",
+									"    pm.expect(body.genero).to.eql('FEMENINO');",
+									"    pm.expect(body.edad).to.eql(30);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Listar clientes",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_clientes}}/clientes?page=0&size=20",
+							"host": ["{{base_clientes}}"],
+							"path": ["clientes"],
+							"query": [
+								{ "key": "page", "value": "0" },
+								{ "key": "size", "value": "20" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Obtener cliente",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_clientes}}/clientes/{{clientId}}",
+							"host": ["{{base_clientes}}"],
+							"path": ["clientes", "{{clientId}}"]
+						}
+					}
+				},
+				{
+					"name": "Actualizar cliente",
+					"request": {
+						"method": "PUT",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nombre\": \"Ana Perez Lopez\",\n  \"genero\": \"FEMENINO\",\n  \"edad\": 31,\n  \"identificacion\": \"1020304050\",\n  \"direccion\": \"Calle 45 #12-30\",\n  \"telefono\": \"3105550001\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{base_clientes}}/clientes/{{clientId}}",
+							"host": ["{{base_clientes}}"],
+							"path": ["clientes", "{{clientId}}"]
+						}
+					}
+				},
+				{
+					"name": "Actualizar cliente parcial",
+					"request": {
+						"method": "PATCH",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"telefono\": \"3111111111\",\n  \"edad\": 31\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{base_clientes}}/clientes/{{clientId}}",
+							"host": ["{{base_clientes}}"],
+							"path": ["clientes", "{{clientId}}"]
+						}
+					}
+				},
+				{
+					"name": "Dar de baja cliente",
+					"description": "Baja logica: el cliente pasa a INACTIVO. De forma asincrona, msa-cuentas desactiva las cuentas activas del cliente.",
+					"request": {
+						"method": "DELETE",
+						"url": {
+							"raw": "{{base_clientes}}/clientes/{{clientId}}",
+							"host": ["{{base_clientes}}"],
+							"path": ["clientes", "{{clientId}}"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('204 No Content', function () { pm.response.to.have.status(204); });"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "msa-cuentas",
+			"item": [
+				{
+					"name": "Crear cuenta",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tipoCuenta\": \"CORRIENTE\",\n  \"saldoInicial\": 500.00,\n  \"clienteId\": \"{{clientId}}\",\n  \"nombreCliente\": \"Ana Perez\",\n  \"identificacion\": \"1020304050\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{base_cuentas}}/cuentas",
+							"host": ["{{base_cuentas}}"],
+							"path": ["cuentas"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('201 Created', function () { pm.response.to.have.status(201); });",
+									"var body = pm.response.json();",
+									"pm.collectionVariables.set('numeroCuenta', body.numeroCuenta);"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Listar cuentas",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_cuentas}}/cuentas?clienteId={{clientId}}",
+							"host": ["{{base_cuentas}}"],
+							"path": ["cuentas"],
+							"query": [{ "key": "clienteId", "value": "{{clientId}}" }]
+						}
+					}
+				},
+				{
+					"name": "Obtener cuenta",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_cuentas}}/cuentas/{{numeroCuenta}}",
+							"host": ["{{base_cuentas}}"],
+							"path": ["cuentas", "{{numeroCuenta}}"]
+						}
+					}
+				},
+				{
+					"name": "Actualizar cuenta",
+					"request": {
+						"method": "PUT",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tipoCuenta\": \"CORRIENTE\",\n  \"estado\": \"INACTIVA\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{base_cuentas}}/cuentas/{{numeroCuenta}}",
+							"host": ["{{base_cuentas}}"],
+							"path": ["cuentas", "{{numeroCuenta}}"]
+						}
+					}
+				},
+				{
+					"name": "Actualizar cuenta parcialmente (PATCH)",
+					"description": "Actualiza solo los campos que llegan en el cuerpo: tipo de cuenta y/o estado. El saldo no se toca por este endpoint.",
+					"request": {
+						"method": "PATCH",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"estado\": \"INACTIVA\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{base_cuentas}}/cuentas/{{numeroCuenta}}",
+							"host": ["{{base_cuentas}}"],
+							"path": ["cuentas", "{{numeroCuenta}}"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('200 OK', function () { pm.response.to.have.status(200); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Actualizar cuentas de un cliente",
+					"description": "Actualiza en bloque el estado de las cuentas activas de un cliente (PATCH sobre la coleccion filtrada). msa-clientes lo llama de forma asincrona cuando el cliente se da de baja.",
+					"request": {
+						"method": "PATCH",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"estado\": \"INACTIVA\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{base_cuentas}}/cuentas?clienteId={{clientId}}",
+							"host": ["{{base_cuentas}}"],
+							"path": ["cuentas"],
+							"query": [{ "key": "clienteId", "value": "{{clientId}}" }]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('200 OK', function () { pm.response.to.have.status(200); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Crear movimiento",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"cuenta\": \"{{numeroCuenta}}\",\n  \"valor\": 100.00,\n  \"referencia\": \"TRANSFERENCIA-001\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{base_cuentas}}/movimientos",
+							"host": ["{{base_cuentas}}"],
+							"path": ["movimientos"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('201 Created', function () { pm.response.to.have.status(201); });",
+									"var body = pm.response.json();",
+									"pm.collectionVariables.set('movimientoId', body.id);",
+									"pm.test('el tipo lo define el signo del valor', function () { pm.expect(body.tipoMovimiento).to.eql('INGRESO'); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Crear movimiento (egreso)",
+					"description": "El signo del valor define el tipo: negativo es egreso, positivo es ingreso.",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"cuenta\": \"{{numeroCuenta}}\",\n  \"valor\": -50.00,\n  \"referencia\": \"RETIRO-001\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{base_cuentas}}/movimientos",
+							"host": ["{{base_cuentas}}"],
+							"path": ["movimientos"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('201 Created', function () { pm.response.to.have.status(201); });",
+									"var body = pm.response.json();",
+									"pm.test('el valor conserva el signo', function () { pm.expect(body.valor).to.be.below(0); });",
+									"pm.test('el tipo lo define el signo del valor', function () { pm.expect(body.tipoMovimiento).to.eql('EGRESO'); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Listar movimientos",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_cuentas}}/movimientos?cuenta={{numeroCuenta}}",
+							"host": ["{{base_cuentas}}"],
+							"path": ["movimientos"],
+							"query": [{ "key": "cuenta", "value": "{{numeroCuenta}}" }]
+						}
+					}
+				},
+				{
+					"name": "Obtener movimiento",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_cuentas}}/movimientos/{{movimientoId}}",
+							"host": ["{{base_cuentas}}"],
+							"path": ["movimientos", "{{movimientoId}}"]
+						}
+					}
+				},
+				{
+					"name": "Actualizar movimiento",
+					"request": {
+						"method": "PUT",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"referencia\": \"TRANSFERENCIA-001-CORREGIDA\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{base_cuentas}}/movimientos/{{movimientoId}}",
+							"host": ["{{base_cuentas}}"],
+							"path": ["movimientos", "{{movimientoId}}"]
+						}
+					}
+				}
+			]
+		}
+	]
+}
