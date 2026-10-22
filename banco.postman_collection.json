@@ -10,7 +10,8 @@
 		{ "key": "base_cuentas", "value": "http://localhost:8082" },
 		{ "key": "clientId", "value": "" },
 		{ "key": "numeroCuenta", "value": "" },
-		{ "key": "movimientoId", "value": "" }
+		{ "key": "movimientoId", "value": "" },
+		{ "key": "cuentaInactiva", "value": "" }
 	],
 	"item": [
 		{
@@ -280,7 +281,7 @@
 						"header": [{ "key": "Content-Type", "value": "application/json" }],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"cuenta\": \"{{numeroCuenta}}\",\n  \"valor\": 100.00,\n  \"referencia\": \"TRANSFERENCIA-001\"\n}",
+							"raw": "{\n  \"cuenta\": \"{{numeroCuenta}}\",\n  \"tipoMovimiento\": \"INGRESO\",\n  \"valor\": 100.00,\n  \"referencia\": \"TRANSFERENCIA-001\"\n}",
 							"options": { "raw": { "language": "json" } }
 						},
 						"url": {
@@ -298,7 +299,8 @@
 									"pm.test('201 Created', function () { pm.response.to.have.status(201); });",
 									"var body = pm.response.json();",
 									"pm.collectionVariables.set('movimientoId', body.id);",
-									"pm.test('el tipo lo define el signo del valor', function () { pm.expect(body.tipoMovimiento).to.eql('INGRESO'); });"
+									"pm.test('el tipo concuerda con el signo del valor', function () { pm.expect(body.tipoMovimiento).to.eql('INGRESO'); });",
+									"pm.test('el saldo resultante queda en 600.00', function () { pm.expect(body.saldo).to.eql(600.00); });"
 								]
 							}
 						}
@@ -306,13 +308,13 @@
 				},
 				{
 					"name": "Crear movimiento (egreso)",
-					"description": "El signo del valor define el tipo: negativo es egreso, positivo es ingreso.",
+					"description": "El tipo EGRESO debe concordar con un valor negativo.",
 					"request": {
 						"method": "POST",
 						"header": [{ "key": "Content-Type", "value": "application/json" }],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"cuenta\": \"{{numeroCuenta}}\",\n  \"valor\": -50.00,\n  \"referencia\": \"RETIRO-001\"\n}",
+							"raw": "{\n  \"cuenta\": \"{{numeroCuenta}}\",\n  \"tipoMovimiento\": \"EGRESO\",\n  \"valor\": -50.00,\n  \"referencia\": \"RETIRO-001\"\n}",
 							"options": { "raw": { "language": "json" } }
 						},
 						"url": {
@@ -330,7 +332,38 @@
 									"pm.test('201 Created', function () { pm.response.to.have.status(201); });",
 									"var body = pm.response.json();",
 									"pm.test('el valor conserva el signo', function () { pm.expect(body.valor).to.be.below(0); });",
-									"pm.test('el tipo lo define el signo del valor', function () { pm.expect(body.tipoMovimiento).to.eql('EGRESO'); });"
+									"pm.test('el tipo concuerda con el signo del valor', function () { pm.expect(body.tipoMovimiento).to.eql('EGRESO'); });",
+									"pm.test('el saldo resultante queda en 550.00', function () { pm.expect(body.saldo).to.eql(550.00); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Movimiento invalido (tipo y signo)",
+					"description": "Un INGRESO exige valor positivo: un valor negativo devuelve 400 TIPO_MOVIMIENTO_INVALIDO y no altera el saldo.",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"cuenta\": \"{{numeroCuenta}}\",\n  \"tipoMovimiento\": \"INGRESO\",\n  \"valor\": -10.00,\n  \"referencia\": \"INVALIDA-001\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{base_cuentas}}/movimientos",
+							"host": ["{{base_cuentas}}"],
+							"path": ["movimientos"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('400 Bad Request', function () { pm.response.to.have.status(400); });",
+									"pm.test('codigo TIPO_MOVIMIENTO_INVALIDO', function () { pm.expect(pm.response.json().code).to.eql('TIPO_MOVIMIENTO_INVALIDO'); });"
 								]
 							}
 						}
@@ -375,6 +408,118 @@
 							"path": ["movimientos", "{{movimientoId}}"]
 						}
 					}
+				},
+				{
+					"name": "Crear cuenta para prueba de inactiva",
+					"description": "Cuenta propia de esta prueba: no altera la cuenta usada por el resto de la coleccion.",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tipoCuenta\": \"AHORRO\",\n  \"saldoInicial\": 50.00,\n  \"clienteId\": \"{{clientId}}\",\n  \"nombreCliente\": \"Ana Perez\",\n  \"identificacion\": \"1020304050\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{base_cuentas}}/cuentas",
+							"host": ["{{base_cuentas}}"],
+							"path": ["cuentas"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('201 Created', function () { pm.response.to.have.status(201); });",
+									"pm.collectionVariables.set('cuentaInactiva', pm.response.json().numeroCuenta);"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Desactivar cuenta",
+					"request": {
+						"method": "PATCH",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"estado\": \"INACTIVA\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{base_cuentas}}/cuentas/{{cuentaInactiva}}",
+							"host": ["{{base_cuentas}}"],
+							"path": ["cuentas", "{{cuentaInactiva}}"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+									"pm.test('cuenta INACTIVA', function () { pm.expect(pm.response.json().estado).to.eql('INACTIVA'); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Movimiento en cuenta inactiva",
+					"description": "Solo las cuentas ACTIVA admiten movimientos: devuelve 409 CUENTA_NO_ACTIVA y no altera el saldo.",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"cuenta\": \"{{cuentaInactiva}}\",\n  \"tipoMovimiento\": \"INGRESO\",\n  \"valor\": 10.00,\n  \"referencia\": \"INACTIVA-001\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{base_cuentas}}/movimientos",
+							"host": ["{{base_cuentas}}"],
+							"path": ["movimientos"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('409 Conflict', function () { pm.response.to.have.status(409); });",
+									"pm.test('codigo CUENTA_NO_ACTIVA', function () { pm.expect(pm.response.json().code).to.eql('CUENTA_NO_ACTIVA'); });"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Verificar saldo intacto",
+					"request": {
+						"method": "GET",
+						"url": {
+							"raw": "{{base_cuentas}}/cuentas/{{cuentaInactiva}}",
+							"host": ["{{base_cuentas}}"],
+							"path": ["cuentas", "{{cuentaInactiva}}"]
+						}
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+									"pm.test('el saldo no cambio', function () { pm.expect(pm.response.json().saldoActual).to.eql(50.00); });"
+								]
+							}
+						}
+					]
 				}
 			]
 		}

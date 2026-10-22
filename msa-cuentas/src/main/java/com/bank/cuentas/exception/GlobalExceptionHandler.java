@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -29,6 +30,21 @@ public class GlobalExceptionHandler {
 		problem.setTitle(ex.getStatus().getReasonPhrase());
 		problem.setType(URI.create("urn:banco:error:" + ex.getCode().toLowerCase()));
 		problem.setProperty("code", ex.getCode());
+		return problem;
+	}
+
+	/**
+	 * Dos actualizaciones concurrentes sobre la misma cuenta: la segunda
+	 * encuentra la version cambiada y se rechaza para que reintente con el
+	 * estado vigente.
+	 */
+	@ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+	public ProblemDetail handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+				"El saldo de la cuenta cambio mientras se registraba el movimiento; reintente la operacion");
+		problem.setTitle(HttpStatus.CONFLICT.getReasonPhrase());
+		problem.setType(URI.create("urn:banco:error:saldo_actualizado_conflicto"));
+		problem.setProperty("code", "SALDO_ACTUALIZADO_CONFLICTO");
 		return problem;
 	}
 

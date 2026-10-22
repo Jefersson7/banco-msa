@@ -1,5 +1,6 @@
 package com.bank.cuentas.service;
 
+import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
@@ -14,7 +15,8 @@ import com.bank.cuentas.dto.CreateMovementRequest;
 import com.bank.cuentas.dto.MovementResponse;
 import com.bank.cuentas.exception.BusinessRuleException;
 import com.bank.cuentas.model.Cuenta;
-import com.bank.cuentas.model.Movimiento; import com.bank.cuentas.model.TipoMovimiento;
+import com.bank.cuentas.model.Movimiento;
+import com.bank.cuentas.model.TipoMovimiento;
 import com.bank.cuentas.repository.AccountRepository;
 import com.bank.cuentas.repository.MovementRepository;
 
@@ -32,22 +34,47 @@ public class MovementService {
 
 	@Transactional
 	public MovementResponse create(CreateMovementRequest request) {
-		Cuenta cuenta = accountRepository.findByAccountNumber(request.cuenta())
+		// Lock pesimista: los movimientos concurrentes de una misma cuenta se
+		// serializan y ninguno pierde su actualizacion de saldo.
+		Cuenta cuenta = accountRepository.findByAccountNumberForUpdate(request.cuenta())
 				.orElseThrow(() -> new BusinessRuleException("CUENTA_NO_ENCONTRADA",
 						"No existe la cuenta " + request.cuenta(), HttpStatus.NOT_FOUND));
 
-		Movimiento movimiento = new Movimiento();
-		movimiento.setCuenta(cuenta);
-		movimiento.setValor(request.valor().setScale(2, RoundingMode.HALF_UP));
-		// El tipo no se recibe: lo define el signo del valor.
-		movimiento.setTipoMovimiento(request.valor().signum() < 0 ? TipoMovimiento.EGRESO : TipoMovimiento.INGRESO);
-		// En F1 el movimiento guarda el saldo que tiene la cuenta; el saldo
-		// disponible se actualiza con la regla de negocio de la iteracion F2.
-		movimiento.setSaldo(cuenta.getSaldoActual());
-		movimiento.setFecha(request.fecha() != null ? request.fecha() : LocalDateTime.now());
-		movimiento.setReferencia(request.referencia());
+		BigDecimal valor = request.valor().setScale(2, RoundingMode.HALF_UP);
+		validarTipoYSigno(request.tipoMovimiento(), valor);
+		if (!cuenta.estaActiva()) {
+			throw new BusinessRuleException("CUENTA_NO_ACTIVA",
+					"No se pueden registrar movimientos en la cuenta " + request.cuenta()
+							+ " porque no esta activa",
+					HttpStatus.CONFLICT);
+		}
+
+		// El saldo se actualiza en la misma transaccion que registra el
+		// movimiento: o se guardan los dos, o no se guarda ninguno.
+		BigDecimal saldoResultante = cuenta.aplicarMovimiento(valor);
+		Movimiento movimiento = Movimiento.registrar(cuenta, request.tipoMovimiento(), valor,
+				saldoResultante, request.fecha() != null ? request.fecha() : LocalDateTime.now(),
+				request.referencia());
 
 		return MovementResponse.from(movementRepository.save(movimiento));
+	}
+
+	/**
+	 * El tipo y el signo del valor son dos caras del mismo dato: un ingreso
+	 * positivo o un egreso negativo. El cero no representa ninguna operacion.
+	 */
+	private void validarTipoYSigno(TipoMovimiento tipo, BigDecimal valor) {
+		if (valor.signum() == 0) {
+			throw new BusinessRuleException("VALOR_INVALIDO",
+					"El valor del movimiento no puede ser cero", HttpStatus.BAD_REQUEST);
+		}
+		boolean concuerda = (tipo == TipoMovimiento.INGRESO && valor.signum() > 0)
+				|| (tipo == TipoMovimiento.EGRESO && valor.signum() < 0);
+		if (!concuerda) {
+			throw new BusinessRuleException("TIPO_MOVIMIENTO_INVALIDO",
+					"El tipo " + tipo + " no concuerda con el signo del valor " + valor,
+					HttpStatus.BAD_REQUEST);
+		}
 	}
 
 	@Transactional(readOnly = true)
@@ -72,13 +99,8 @@ public class MovementService {
 	public MovementResponse update(Long id, UpdateMovementRequest request) {
 		Movimiento movimiento = findExistingMovement(id);
 		ensureAccountingDataUnchanged(movimiento, request);
-		if (request.fecha() != null) {
-			movimiento.setFecha(request.fecha());
-		}
-		if (request.referencia() != null) {
-			movimiento.setReferencia(request.referencia());
-		}
-		return MovementResponse.from(movementRepository.save(movimiento));
+		movimiento.actualizarMetadatos(request.fecha(), request.referencia());
+		return MovementResponse.from(movimiento);
 	}
 
 	private void ensureAccountingDataUnchanged(Movimiento movimiento, UpdateMovementRequest request) {
