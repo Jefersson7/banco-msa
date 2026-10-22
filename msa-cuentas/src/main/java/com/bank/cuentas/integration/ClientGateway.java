@@ -37,6 +37,20 @@ public class ClientGateway {
 	 * saber si el cliente sigue activo.
 	 */
 	public void verificarClienteActivo(String clientId) {
+		ClienteRemoto cliente = verificarClienteExiste(clientId);
+		if (!ESTADO_ACTIVO.equals(cliente.estado())) {
+			throw new BusinessRuleException("CLIENTE_INACTIVO",
+					"El cliente " + clientId + " esta inactivo: no se pueden abrir cuentas a su nombre",
+					HttpStatus.CONFLICT);
+		}
+	}
+
+	/**
+	 * Verifica que el cliente exista en msa-clientes y devuelve su proyeccion.
+	 * No exige que este activo: el reporte de estado de cuenta debe poder
+	 * consultarse aunque el cliente se haya dado de baja.
+	 */
+	public ClienteRemoto verificarClienteExiste(String clientId) {
 		ClienteRemoto cliente;
 		try {
 			cliente = restClient.get()
@@ -59,11 +73,7 @@ public class ClientGateway {
 					"No se pudo verificar el estado del cliente " + clientId + ": msa-clientes no responde",
 					HttpStatus.SERVICE_UNAVAILABLE);
 		}
-		if (!ESTADO_ACTIVO.equals(cliente.estado())) {
-			throw new BusinessRuleException("CLIENTE_INACTIVO",
-					"El cliente " + clientId + " esta inactivo: no se pueden abrir cuentas a su nombre",
-					HttpStatus.CONFLICT);
-		}
+		return cliente;
 	}
 
 	/**
