@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "b5a0f3c2-7d41-4e8a-9c6b-2f0a1d4e8b71",
 		"name": "banco-msa",
-		"description": "API de la prueba tecnica Arquitectura Microservicio. msa-clientes (8081) y msa-cuentas (8082).",
+		"description": "API de la prueba tecnica Arquitectura Microservicio. msa-clientes (8081) y msa-cuentas (8082). La coleccion se ejecuta en orden: las peticiones de alta guardan las variables que consumen las siguientes. El flujo respeta las reglas de negocio para que un run completo pase en verde.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"variable": [
@@ -11,7 +11,9 @@
 		{ "key": "clientId", "value": "" },
 		{ "key": "numeroCuenta", "value": "" },
 		{ "key": "movimientoId", "value": "" },
-		{ "key": "cuentaInactiva", "value": "" }
+		{ "key": "cuentaInactiva", "value": "" },
+		{ "key": "cuentaSinSaldo", "value": "" },
+		{ "key": "saldoCuentaAntes", "value": "" }
 	],
 	"item": [
 		{
@@ -116,29 +118,6 @@
 							"path": ["clientes", "{{clientId}}"]
 						}
 					}
-				},
-				{
-					"name": "Dar de baja cliente",
-					"description": "Baja logica: el cliente pasa a INACTIVO. De forma asincrona, msa-cuentas desactiva las cuentas activas del cliente.",
-					"request": {
-						"method": "DELETE",
-						"url": {
-							"raw": "{{base_clientes}}/clientes/{{clientId}}",
-							"host": ["{{base_clientes}}"],
-							"path": ["clientes", "{{clientId}}"]
-						}
-					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"pm.test('204 No Content', function () { pm.response.to.have.status(204); });"
-								]
-							}
-						}
-					]
 				}
 			]
 		},
@@ -196,41 +175,6 @@
 							"host": ["{{base_cuentas}}"],
 							"path": ["cuentas", "{{numeroCuenta}}"]
 						}
-					}
-				},
-				{
-					"name": "Actualizar cuenta",
-					"request": {
-						"method": "PUT",
-						"header": [{ "key": "Content-Type", "value": "application/json" }],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"tipoCuenta\": \"CORRIENTE\",\n  \"estado\": \"INACTIVA\"\n}",
-							"options": { "raw": { "language": "json" } }
-						},
-						"url": {
-							"raw": "{{base_cuentas}}/cuentas/{{numeroCuenta}}",
-							"host": ["{{base_cuentas}}"],
-							"path": ["cuentas", "{{numeroCuenta}}"]
-						}
-					}
-				},
-				{
-					"name": "Actualizar cuenta parcialmente (PATCH)",
-					"description": "Actualiza solo los campos que llegan en el cuerpo: tipo de cuenta y/o estado. El saldo no se toca por este endpoint.",
-					"request": {
-						"method": "PATCH",
-						"header": [{ "key": "Content-Type", "value": "application/json" }],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"estado\": \"INACTIVA\"\n}",
-							"options": { "raw": { "language": "json" } }
-						},
-						"url": {
-							"raw": "{{base_cuentas}}/cuentas/{{numeroCuenta}}",
-							"host": ["{{base_cuentas}}"],
-							"path": ["cuentas", "{{numeroCuenta}}"]
-						}
 					},
 					"event": [
 						{
@@ -238,37 +182,8 @@
 							"script": {
 								"type": "text/javascript",
 								"exec": [
-									"pm.test('200 OK', function () { pm.response.to.have.status(200); });"
-								]
-							}
-						}
-					]
-				},
-				{
-					"name": "Actualizar cuentas de un cliente",
-					"description": "Actualiza en bloque el estado de las cuentas activas de un cliente (PATCH sobre la coleccion filtrada). msa-clientes lo llama de forma asincrona cuando el cliente se da de baja.",
-					"request": {
-						"method": "PATCH",
-						"header": [{ "key": "Content-Type", "value": "application/json" }],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"estado\": \"INACTIVA\"\n}",
-							"options": { "raw": { "language": "json" } }
-						},
-						"url": {
-							"raw": "{{base_cuentas}}/cuentas?clienteId={{clientId}}",
-							"host": ["{{base_cuentas}}"],
-							"path": ["cuentas"],
-							"query": [{ "key": "clienteId", "value": "{{clientId}}" }]
-						}
-					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"pm.test('200 OK', function () { pm.response.to.have.status(200); });"
+									"pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+									"pm.collectionVariables.set('saldoCuentaAntes', pm.response.json().saldoActual);"
 								]
 							}
 						}
@@ -300,7 +215,10 @@
 									"var body = pm.response.json();",
 									"pm.collectionVariables.set('movimientoId', body.id);",
 									"pm.test('el tipo concuerda con el signo del valor', function () { pm.expect(body.tipoMovimiento).to.eql('INGRESO'); });",
-									"pm.test('el saldo resultante queda en 600.00', function () { pm.expect(body.saldo).to.eql(600.00); });"
+									"pm.test('el saldo resultante es el anterior mas el valor', function () {",
+									"    var saldoAntes = Number(pm.collectionVariables.get('saldoCuentaAntes'));",
+									"    pm.expect(body.saldo).to.eql(saldoAntes + 100.00);",
+									"});"
 								]
 							}
 						}
@@ -333,40 +251,10 @@
 									"var body = pm.response.json();",
 									"pm.test('el valor conserva el signo', function () { pm.expect(body.valor).to.be.below(0); });",
 									"pm.test('el tipo concuerda con el signo del valor', function () { pm.expect(body.tipoMovimiento).to.eql('EGRESO'); });",
-									"pm.test('el saldo resultante queda en 550.00', function () { pm.expect(body.saldo).to.eql(550.00); });"
-								]
-							}
-						}
-					]
-				},
-				{
-					"name": "Movimiento sin saldo (egreso)",
-					"description": "Un egreso que dejaria el saldo por debajo de cero devuelve 422 SALDO_NO_DISPONIBLE con el detalle \"Saldo no disponible\" y no altera el saldo. La cuenta indicada debe tener saldo menor al egreso.",
-					"request": {
-						"method": "POST",
-						"header": [{ "key": "Content-Type", "value": "application/json" }],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"cuenta\": \"{{numeroCuenta}}\",\n  \"tipoMovimiento\": \"EGRESO\",\n  \"valor\": -999999.00,\n  \"referencia\": \"SIN-SALDO-001\"\n}",
-							"options": { "raw": { "language": "json" } }
-						},
-						"url": {
-							"raw": "{{base_cuentas}}/movimientos",
-							"host": ["{{base_cuentas}}"],
-							"path": ["movimientos"]
-						}
-					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"pm.test('422 Unprocessable Content', function () { pm.response.to.have.status(422); });",
-									"var body = pm.response.json();",
-									"pm.test('title Saldo insuficiente', function () { pm.expect(body.title).to.eql('Saldo insuficiente'); });",
-									"pm.test('detail Saldo no disponible', function () { pm.expect(body.detail).to.eql('Saldo no disponible'); });",
-									"pm.test('codigo SALDO_NO_DISPONIBLE', function () { pm.expect(body.code).to.eql('SALDO_NO_DISPONIBLE'); });"
+									"pm.test('el saldo resultante es el anterior menos 50.00', function () {",
+									"    var saldoAntes = Number(pm.collectionVariables.get('saldoCuentaAntes'));",
+									"    pm.expect(body.saldo).to.eql(saldoAntes + 100.00 - 50.00);",
+									"});"
 								]
 							}
 						}
@@ -443,49 +331,222 @@
 					}
 				},
 				{
-					"name": "Crear cuenta para prueba de inactiva",
-					"description": "Cuenta propia de esta prueba: no altera la cuenta usada por el resto de la coleccion.",
-					"request": {
-						"method": "POST",
-						"header": [{ "key": "Content-Type", "value": "application/json" }],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"tipoCuenta\": \"AHORRO\",\n  \"saldoInicial\": 50.00,\n  \"clienteId\": \"{{clientId}}\",\n  \"nombreCliente\": \"Ana Perez\",\n  \"identificacion\": \"1020304050\"\n}",
-							"options": { "raw": { "language": "json" } }
-						},
-						"url": {
-							"raw": "{{base_cuentas}}/cuentas",
-							"host": ["{{base_cuentas}}"],
-							"path": ["cuentas"]
-						}
-					},
-					"event": [
+					"name": "Escenarios de estado",
+					"item": [
 						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"pm.test('201 Created', function () { pm.response.to.have.status(201); });",
-									"pm.collectionVariables.set('cuentaInactiva', pm.response.json().numeroCuenta);"
-								]
-							}
+							"name": "Crear cuenta para prueba de inactiva",
+							"description": "Cuenta propia de esta prueba: no altera la cuenta usada por el resto de la coleccion.",
+							"request": {
+								"method": "POST",
+								"header": [{ "key": "Content-Type", "value": "application/json" }],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"tipoCuenta\": \"AHORRO\",\n  \"saldoInicial\": 50.00,\n  \"clienteId\": \"{{clientId}}\",\n  \"nombreCliente\": \"Ana Perez\",\n  \"identificacion\": \"1020304050\"\n}",
+									"options": { "raw": { "language": "json" } }
+								},
+								"url": {
+									"raw": "{{base_cuentas}}/cuentas",
+									"host": ["{{base_cuentas}}"],
+									"path": ["cuentas"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('201 Created', function () { pm.response.to.have.status(201); });",
+											"pm.collectionVariables.set('cuentaInactiva', pm.response.json().numeroCuenta);"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Desactivar cuenta",
+							"request": {
+								"method": "PATCH",
+								"header": [{ "key": "Content-Type", "value": "application/json" }],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"estado\": \"INACTIVA\"\n}",
+									"options": { "raw": { "language": "json" } }
+								},
+								"url": {
+									"raw": "{{base_cuentas}}/cuentas/{{cuentaInactiva}}",
+									"host": ["{{base_cuentas}}"],
+									"path": ["cuentas", "{{cuentaInactiva}}"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+											"pm.test('cuenta INACTIVA', function () { pm.expect(pm.response.json().estado).to.eql('INACTIVA'); });"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Movimiento en cuenta inactiva",
+							"description": "Solo las cuentas ACTIVA admiten movimientos: devuelve 409 CUENTA_NO_ACTIVA y no altera el saldo.",
+							"request": {
+								"method": "POST",
+								"header": [{ "key": "Content-Type", "value": "application/json" }],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"cuenta\": \"{{cuentaInactiva}}\",\n  \"tipoMovimiento\": \"INGRESO\",\n  \"valor\": 10.00,\n  \"referencia\": \"INACTIVA-001\"\n}",
+									"options": { "raw": { "language": "json" } }
+								},
+								"url": {
+									"raw": "{{base_cuentas}}/movimientos",
+									"host": ["{{base_cuentas}}"],
+									"path": ["movimientos"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('409 Conflict', function () { pm.response.to.have.status(409); });",
+											"pm.test('codigo CUENTA_NO_ACTIVA', function () { pm.expect(pm.response.json().code).to.eql('CUENTA_NO_ACTIVA'); });"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Verificar saldo intacto",
+							"request": {
+								"method": "GET",
+								"url": {
+									"raw": "{{base_cuentas}}/cuentas/{{cuentaInactiva}}",
+									"host": ["{{base_cuentas}}"],
+									"path": ["cuentas", "{{cuentaInactiva}}"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+											"pm.test('el saldo no cambio', function () { pm.expect(pm.response.json().saldoActual).to.eql(50.00); });"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Crear cuenta sin saldo",
+							"description": "Cuenta con saldo bajo para validar el rechazo del egreso sin saldo.",
+							"request": {
+								"method": "POST",
+								"header": [{ "key": "Content-Type", "value": "application/json" }],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"tipoCuenta\": \"AHORRO\",\n  \"saldoInicial\": 100.00,\n  \"clienteId\": \"{{clientId}}\",\n  \"nombreCliente\": \"Ana Perez\",\n  \"identificacion\": \"1020304050\"\n}",
+									"options": { "raw": { "language": "json" } }
+								},
+								"url": {
+									"raw": "{{base_cuentas}}/cuentas",
+									"host": ["{{base_cuentas}}"],
+									"path": ["cuentas"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('201 Created', function () { pm.response.to.have.status(201); });",
+											"pm.collectionVariables.set('cuentaSinSaldo', pm.response.json().numeroCuenta);"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Movimiento sin saldo (egreso)",
+							"description": "Un egreso que dejaria el saldo por debajo de cero devuelve 422 SALDO_NO_DISPONIBLE con el detalle \"Saldo no disponible\" y no altera el saldo.",
+							"request": {
+								"method": "POST",
+								"header": [{ "key": "Content-Type", "value": "application/json" }],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"cuenta\": \"{{cuentaSinSaldo}}\",\n  \"tipoMovimiento\": \"EGRESO\",\n  \"valor\": -150.00,\n  \"referencia\": \"SIN-SALDO-001\"\n}",
+									"options": { "raw": { "language": "json" } }
+								},
+								"url": {
+									"raw": "{{base_cuentas}}/movimientos",
+									"host": ["{{base_cuentas}}"],
+									"path": ["movimientos"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('422 Unprocessable Content', function () { pm.response.to.have.status(422); });",
+											"var body = pm.response.json();",
+											"pm.test('title Saldo insuficiente', function () { pm.expect(body.title).to.eql('Saldo insuficiente'); });",
+											"pm.test('detail Saldo no disponible', function () { pm.expect(body.detail).to.eql('Saldo no disponible'); });",
+											"pm.test('codigo SALDO_NO_DISPONIBLE', function () { pm.expect(body.code).to.eql('SALDO_NO_DISPONIBLE'); });"
+										]
+									}
+								}
+							]
+						},
+						{
+							"name": "Verificar saldo sin cambios",
+							"request": {
+								"method": "GET",
+								"url": {
+									"raw": "{{base_cuentas}}/cuentas/{{cuentaSinSaldo}}",
+									"host": ["{{base_cuentas}}"],
+									"path": ["cuentas", "{{cuentaSinSaldo}}"]
+								}
+							},
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('200 OK', function () { pm.response.to.have.status(200); });",
+											"pm.test('el saldo no cambio', function () { pm.expect(pm.response.json().saldoActual).to.eql(100.00); });"
+										]
+									}
+								}
+							]
 						}
 					]
-				},
+				}
+			]
+		},
+		{
+			"name": "msa-clientes (cierre)",
+			"item": [
 				{
-					"name": "Desactivar cuenta",
+					"name": "Dar de baja cliente",
+					"description": "Baja logica: el cliente pasa a INACTIVO. De forma asincrona, msa-cuentas desactiva las cuentas activas del cliente. Va al final del run para no inactivar al cliente antes de crear sus cuentas.",
 					"request": {
-						"method": "PATCH",
-						"header": [{ "key": "Content-Type", "value": "application/json" }],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"estado\": \"INACTIVA\"\n}",
-							"options": { "raw": { "language": "json" } }
-						},
+						"method": "DELETE",
 						"url": {
-							"raw": "{{base_cuentas}}/cuentas/{{cuentaInactiva}}",
-							"host": ["{{base_cuentas}}"],
-							"path": ["cuentas", "{{cuentaInactiva}}"]
+							"raw": "{{base_clientes}}/clientes/{{clientId}}",
+							"host": ["{{base_clientes}}"],
+							"path": ["clientes", "{{clientId}}"]
 						}
 					},
 					"event": [
@@ -494,61 +555,7 @@
 							"script": {
 								"type": "text/javascript",
 								"exec": [
-									"pm.test('200 OK', function () { pm.response.to.have.status(200); });",
-									"pm.test('cuenta INACTIVA', function () { pm.expect(pm.response.json().estado).to.eql('INACTIVA'); });"
-								]
-							}
-						}
-					]
-				},
-				{
-					"name": "Movimiento en cuenta inactiva",
-					"description": "Solo las cuentas ACTIVA admiten movimientos: devuelve 409 CUENTA_NO_ACTIVA y no altera el saldo.",
-					"request": {
-						"method": "POST",
-						"header": [{ "key": "Content-Type", "value": "application/json" }],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"cuenta\": \"{{cuentaInactiva}}\",\n  \"tipoMovimiento\": \"INGRESO\",\n  \"valor\": 10.00,\n  \"referencia\": \"INACTIVA-001\"\n}",
-							"options": { "raw": { "language": "json" } }
-						},
-						"url": {
-							"raw": "{{base_cuentas}}/movimientos",
-							"host": ["{{base_cuentas}}"],
-							"path": ["movimientos"]
-						}
-					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"pm.test('409 Conflict', function () { pm.response.to.have.status(409); });",
-									"pm.test('codigo CUENTA_NO_ACTIVA', function () { pm.expect(pm.response.json().code).to.eql('CUENTA_NO_ACTIVA'); });"
-								]
-							}
-						}
-					]
-				},
-				{
-					"name": "Verificar saldo intacto",
-					"request": {
-						"method": "GET",
-						"url": {
-							"raw": "{{base_cuentas}}/cuentas/{{cuentaInactiva}}",
-							"host": ["{{base_cuentas}}"],
-							"path": ["cuentas", "{{cuentaInactiva}}"]
-						}
-					},
-					"event": [
-						{
-							"listen": "test",
-							"script": {
-								"type": "text/javascript",
-								"exec": [
-									"pm.test('200 OK', function () { pm.response.to.have.status(200); });",
-									"pm.test('el saldo no cambio', function () { pm.expect(pm.response.json().saldoActual).to.eql(50.00); });"
+									"pm.test('204 No Content', function () { pm.response.to.have.status(204); });"
 								]
 							}
 						}
