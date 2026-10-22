@@ -28,6 +28,13 @@ spring:
 server:
   port: ${SERVER_PORT:8082}
 
+# Datos de cliente: son de msa-clientes, asi que se consultan ahi para validar
+# que el cliente exista y siga activo antes de abrirle una cuenta.
+app:
+  ms:
+    clientes:
+      base-url: ${CLIENTES_BASE_URL:http://localhost:8081}
+
 management:
   endpoints:
     web:
