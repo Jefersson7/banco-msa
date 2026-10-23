@@ -61,30 +61,35 @@ interno) y a `postgres-clientes` (el nombre del servicio).
 
 ## Cómo ejecutar
 
-### 1. Levantar las bases de datos
+### 1. Levantar todo con Docker Compose
+
+Prerrequisitos: Docker Desktop/Engine, puertos libres `8081`, `8082`, `5433`, `5434`.
 
 ```bash
 cp .env.example .env        # en PowerShell: Copy-Item .env.example .env
-docker compose up -d
-docker compose ps           # ambos Postgres deben quedar "healthy"
+docker compose up --build   # levanta Postgres + msa-clientes + msa-cuentas
+# o en segundo plano
+docker compose up -d --build
 ```
-
-Para empezar de cero, borrando también los volúmenes y con ello los datos:
 
 ```bash
-docker compose down -v      # elimina contenedores, red y volúmenes
-docker compose up -d        # recrea las bases de datos vacías
+docker compose ps           # todos los servicios deben quedar "healthy"/"running"
 ```
 
-No hace falta ningún script de inicialización: las tablas las crea Hibernate (`ddl-auto: update`)
-al arrancar cada microservicio.
+Los microservicios se comunican por nombre de servicio dentro de la red de Docker: `http://msa-clientes:8081` y `http://msa-cuentas:8082`. Las bases de datos siguen usando el puerto interno `5432`.
 
-> Si la base de datos de clientes ya existía con el esquema anterior (una sola tabla `cliente`),
-> hay que resetear los volúmenes: `docker compose down -v && docker compose up -d`. Con la
-> herencia `JOINED` el esquema ahora son dos tablas (`persona` y `cliente`) y `ddl-auto: update`
-> no borra las columnas que quedan sin uso.
+Detener:
+```bash
+docker compose down         # elimina contenedores y red (mantiene volúmenes)
+docker compose down -v      # elimina contenedores, red y volúmenes (borra los datos)
+```
 
-### 2. Levantar los microservicios
+### 2. Levantar en local (desarrollo)
+
+```bash
+cp .env.example .env        # en PowerShell: Copy-Item .env.example .env
+docker compose up -d        # solo bases de datos
+```
 
 ```bash
 cd msa-clientes
@@ -96,6 +101,14 @@ cd msa-cuentas
 
 En la segunda terminal, `msa-clientes` alcanza a `msa-cuentas` en `http://localhost:8082`
 (configurable con `CUENTAS_BASE_URL`).
+
+No hace falta ningún script de inicialización: las tablas las crea Hibernate (`ddl-auto: update`)
+al arrancar cada microservicio.
+
+> Si la base de datos de clientes ya existía con el esquema anterior (una sola tabla `cliente`),
+> hay que resetear los volúmenes: `docker compose down -v && docker compose up -d`. Con la
+> herencia `JOINED` el esquema ahora son dos tablas (`persona` y `cliente`) y `ddl-auto: update`
+> no borra las columnas que quedan sin uso.
 
 ### 3. Verificar
 
@@ -109,9 +122,25 @@ las peticiones y guarda el `clientId` y el `numeroCuenta` devueltos en las varia
 
 ## Pruebas
 
+### Prueba unitaria (msa-clientes)
+
 ```bash
-cd msa-clientes && ./mvnw test
-cd msa-cuentas  && ./mvnw test
+cd msa-clientes
+sh mvnw test -Dtest=ClienteTest
+```
+
+### Prueba de integración (msa-cuentas)
+
+```bash
+cd msa-cuentas
+sh mvnw test -Dtest=CuentaMovimientoIntegrationTest
+```
+
+### Todas las pruebas
+
+```bash
+cd msa-clientes && sh mvnw test
+cd msa-cuentas  && sh mvnw test
 ```
 
 Las pruebas de integración usan **Testcontainers** (PostgreSQL real en contenedor), por lo que
