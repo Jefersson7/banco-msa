@@ -1,7 +1,6 @@
 name: banco-msa
 
-# Entorno de desarrollo: una base de datos por microservicio.
-# Los dos microservicios se agregan a este archivo en la iteración F7.
+# Entorno de desarrollo: una base de datos por microservicio y los dos microservicios.
 services:
 
   postgres-clientes:
@@ -40,6 +39,46 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+    restart: unless-stopped
+
+  msa-clientes:
+    build:
+      context: ./msa-clientes
+      dockerfile: Dockerfile
+    container_name: banco-msa-clientes
+    depends_on:
+      postgres-clientes:
+        condition: service_healthy
+    environment:
+      DB_CLIENTES_HOST: postgres-clientes
+      DB_CLIENTES_PORT: 5432
+      DB_CLIENTES_NAME: ${DB_CLIENTES_NAME:-clientes_db}
+      DB_USER: ${DB_USER:-banco}
+      DB_PASSWORD: ${DB_PASSWORD:-banco}
+      CUENTAS_BASE_URL: http://msa-cuentas:8082
+      SERVER_PORT: 8081
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+
+  msa-cuentas:
+    build:
+      context: ./msa-cuentas
+      dockerfile: Dockerfile
+    container_name: banco-msa-cuentas
+    depends_on:
+      postgres-cuentas:
+        condition: service_healthy
+    environment:
+      DB_CUENTAS_HOST: postgres-cuentas
+      DB_CUENTAS_PORT: 5432
+      DB_CUENTAS_NAME: ${DB_CUENTAS_NAME:-cuentas_db}
+      DB_USER: ${DB_USER:-banco}
+      DB_PASSWORD: ${DB_PASSWORD:-banco}
+      CLIENTES_BASE_URL: http://msa-clientes:8081
+      SERVER_PORT: 8082
+    ports:
+      - "8082:8082"
     restart: unless-stopped
 
 volumes:
