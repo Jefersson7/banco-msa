@@ -30,7 +30,6 @@ repositorio, que comparten Docker Compose y los dos microservicios.
 | `DB_USER` / `DB_PASSWORD` | Credenciales de las dos bases de datos |
 | `DB_CLIENTES_HOST` / `_PORT` / `_NAME` | Dónde está la base de datos de `msa-clientes` |
 | `DB_CUENTAS_HOST` / `_PORT` / `_NAME` | Dónde está la base de datos de `msa-cuentas` |
-| `CLIENTES_PORT` / `CUENTAS_PORT` | Puertos publicados de los microservicios |
 | `CUENTAS_BASE_URL` | URL de `msa-cuentas` vista desde `msa-clientes` |
 | `CLIENTES_BASE_URL` | URL de `msa-clientes` vista desde `msa-cuentas` |
 
@@ -60,6 +59,9 @@ microservicios se ejecutan en Docker, el compose sobrescribe ese valor a `5432` 
 interno) y a `postgres-clientes` (el nombre del servicio).
 
 ## Cómo ejecutar
+
+Los pasos 1 y 2 son alternativas: el paso 1 levanta todo con Docker Compose y el paso 2 ejecuta
+los microservicios en el host contra las bases en Docker. No ejecutes ambos a la vez.
 
 ### 1. Levantar todo con Docker Compose
 
@@ -107,7 +109,8 @@ al arrancar cada microservicio. Opcionalmente, `BaseDatos.sql` crea las bases, e
 registros de ejemplo (ver paso 3).
 
 > Si la base de datos de clientes ya existía con el esquema anterior (una sola tabla `cliente`),
-> hay que resetear los volúmenes: `docker compose down -v && docker compose up -d`. Con la
+> hay que resetear los volúmenes:
+> `docker compose down -v && docker compose up -d postgres-clientes postgres-cuentas`. Con la
 > herencia `JOINED` el esquema ahora son dos tablas (`persona` y `cliente`) y `ddl-auto: update`
 > no borra las columnas que quedan sin uso.
 
