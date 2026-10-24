@@ -88,7 +88,7 @@ docker compose down -v      # elimina contenedores, red y volúmenes (borra los 
 
 ```bash
 cp .env.example .env        # en PowerShell: Copy-Item .env.example .env
-docker compose up -d        # solo bases de datos
+docker compose up -d postgres-clientes postgres-cuentas   # solo bases de datos
 ```
 
 ```bash
@@ -103,14 +103,42 @@ En la segunda terminal, `msa-clientes` alcanza a `msa-cuentas` en `http://localh
 (configurable con `CUENTAS_BASE_URL`).
 
 No hace falta ningún script de inicialización: las tablas las crea Hibernate (`ddl-auto: update`)
-al arrancar cada microservicio.
+al arrancar cada microservicio. Opcionalmente, `BaseDatos.sql` crea las bases, el esquema y los
+registros de ejemplo (ver paso 3).
 
 > Si la base de datos de clientes ya existía con el esquema anterior (una sola tabla `cliente`),
 > hay que resetear los volúmenes: `docker compose down -v && docker compose up -d`. Con la
 > herencia `JOINED` el esquema ahora son dos tablas (`persona` y `cliente`) y `ddl-auto: update`
 > no borra las columnas que quedan sin uso.
 
-### 3. Verificar
+### 3. Cargar los datos de ejemplo (opcional)
+
+`BaseDatos.sql` es opcional: las tablas ya las crea Hibernate al arrancar. El script crea las
+bases/tablas que falten y carga 10 clientes, 20 cuentas y 70 movimientos. Está pensado para
+ejecutarse una sola vez sobre una base sin datos y asume los valores por defecto de
+`.env.example` (`banco`/`banco`, `clientes_db` y `cuentas_db`). Desde la raíz del repositorio:
+
+```bash
+docker compose exec -T -e PGPASSWORD=banco postgres-clientes \
+  psql -U banco -d postgres -f - < BaseDatos.sql
+```
+
+En PowerShell:
+
+```powershell
+Get-Content BaseDatos.sql -Raw | docker compose exec -T -e PGPASSWORD=banco postgres-clientes psql -U banco -d postgres -f -
+```
+
+El script se conecta por la red de Compose a `postgres-clientes:5432` (clientes) y
+`postgres-cuentas:5432` (cuentas); por eso se ejecuta desde el contenedor de clientes y no
+desde el host. Si cambias `DB_USER`, `DB_PASSWORD` o los nombres de las bases en `.env`, ajusta
+el comando y los `\connect` del script.
+
+Si necesitas repetir la carga, resetea los volúmenes (`docker compose down -v`) y vuelve a
+levantar. Los `INSERT` no son idempotentes: como el script tiene `ON_ERROR_STOP`, se detiene en
+el primer duplicado en lugar de dejar datos a medias.
+
+### 4. Verificar
 
 ```bash
 curl http://localhost:8081/actuator/health
@@ -183,6 +211,7 @@ código de negocio en el campo `code`.
 ```
 banco-msa/
 ├── docker-compose.yml           # una base de datos por microservicio
+├── BaseDatos.sql                # esquema y datos de ejemplo de ambas bases
 ├── .env.example                 # credenciales de ejemplo (el .env real no se versiona)
 ├── banco.postman_collection.json
 ├── msa-clientes/                # com.bank.clientes
