@@ -44,8 +44,8 @@
 								"type": "text/javascript",
 								"exec": [
 									"pm.test('201 Created', function () { pm.response.to.have.status(201); });",
+									"var body = pm.response.json();",
 									"pm.test('devuelve clientId', function () {",
-									"    var body = pm.response.json();",
 									"    pm.expect(body.clientId).to.be.a('string');",
 									"    pm.collectionVariables.set('clientId', body.clientId);",
 									"});",
