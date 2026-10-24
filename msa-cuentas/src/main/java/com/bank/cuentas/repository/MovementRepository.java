@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,9 +14,14 @@ import com.bank.cuentas.model.Movimiento;
 
 public interface MovementRepository extends JpaRepository<Movimiento, Long> {
 
+	@Override
+	@EntityGraph(attributePaths = "cuenta")
+	Page<Movimiento> findAll(Pageable pageable);
+
 	/**
 	 * Lista los movimientos de una cuenta. Filtra por {@code cuenta.numeroCuenta}.
 	 */
+	@EntityGraph(attributePaths = "cuenta")
 	@Query("select m from Movimiento m where m.cuenta.numeroCuenta = :accountNumber")
 	Page<Movimiento> findByAccountNumber(@Param("accountNumber") String accountNumber, Pageable pageable);
 

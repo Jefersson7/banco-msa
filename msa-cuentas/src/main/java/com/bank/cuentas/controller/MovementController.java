@@ -51,7 +51,7 @@ public class MovementController {
 
 	@PutMapping("/{id}")
 	public MovementResponse update(@PathVariable Long id,
-			@RequestBody UpdateMovementRequest request) {
+			@Valid @RequestBody UpdateMovementRequest request) {
 		return movementService.update(id, request);
 	}
 

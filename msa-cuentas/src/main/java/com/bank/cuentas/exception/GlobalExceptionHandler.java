@@ -1,11 +1,13 @@
 package com.bank.cuentas.exception;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -32,6 +34,24 @@ public class GlobalExceptionHandler {
 		ProblemDetail problem = ProblemDetail.forStatusAndDetail(ex.getStatus(), ex.getMessage());
 		problem.setTitle(ex.getStatus().getReasonPhrase());
 		problem.setProperty("code", ex.getCode());
+		return problem;
+	}
+
+	@ExceptionHandler(DataIntegrityViolationException.class)
+	public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+		Throwable cause = ex.getMostSpecificCause();
+		if (cause instanceof SQLException sqlException && "23505".equals(sqlException.getSQLState())) {
+			ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+					"Ya existe un registro con los mismos datos");
+			problem.setTitle(HttpStatus.CONFLICT.getReasonPhrase());
+			problem.setProperty("code", "CONFLICTO_DATOS");
+			return problem;
+		}
+		log.error("Error de integridad no controlado en msa-cuentas", ex);
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
+				"Ocurrio un error inesperado");
+		problem.setTitle(HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase());
+		problem.setProperty("code", "ERROR_INTERNO");
 		return problem;
 	}
 

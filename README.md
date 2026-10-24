@@ -204,7 +204,7 @@ requieren Docker activo.
 | GET | `/movimientos` | Lista paginada de movimientos. Filtro opcional por `cuenta` |
 | GET | `/movimientos/{id}` | Consulta un movimiento |
 | PUT | `/movimientos/{id}` | Actualiza la fecha y la referencia del movimiento |
-| GET | `/reportes` | Estado de cuenta de un cliente en un rango de fechas (`cliente`, `fechaInicio`, `fechaFin` en formato `YYYY-MM-DD`, inclusive por día completo). Devuelve las cuentas con movimientos en el rango, cada una con su saldo actual, su saldo al inicio del rango y el detalle de movimientos |
+| GET | `/reportes` | Estado de cuenta de un cliente en un rango de fechas (`cliente`, `fechaInicio`, `fechaFin` en formato `YYYY-MM-DD`, inclusive por día completo). Devuelve las cuentas con movimientos en el rango, cada una con su saldo actual y el detalle de movimientos |
 
 Los errores de negocio y de validación se devuelven como `ProblemDetail` (RFC 7807) con el
 código de negocio en el campo `code`.

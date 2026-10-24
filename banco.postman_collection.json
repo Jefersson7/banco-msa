@@ -11,6 +11,8 @@
 		{ "key": "clientId", "value": "" },
 		{ "key": "numeroCuenta", "value": "" },
 		{ "key": "movimientoId", "value": "" },
+		{ "key": "movimientoFecha", "value": "" },
+		{ "key": "movimientoValor", "value": "" },
 		{ "key": "cuentaInactiva", "value": "" },
 		{ "key": "cuentaSinSaldo", "value": "" },
 		{ "key": "saldoCuentaAntes", "value": "" }
@@ -42,8 +44,8 @@
 								"type": "text/javascript",
 								"exec": [
 									"pm.test('201 Created', function () { pm.response.to.have.status(201); });",
+									"var body = pm.response.json();",
 									"pm.test('devuelve clientId', function () {",
-									"    var body = pm.response.json();",
 									"    pm.expect(body.clientId).to.be.a('string');",
 									"    pm.collectionVariables.set('clientId', body.clientId);",
 									"});",
@@ -109,7 +111,7 @@
 						"header": [{ "key": "Content-Type", "value": "application/json" }],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"telefono\": \"3111111111\",\n  \"edad\": 31\n}",
+							"raw": "{\n  \"nombre\": \"Ana Perez Lopez\",\n  \"genero\": \"FEMENINO\",\n  \"edad\": 31,\n  \"identificacion\": \"1020304050\",\n  \"direccion\": \"Calle 45 #12-30\",\n  \"telefono\": \"3111111111\"\n}",
 							"options": { "raw": { "language": "json" } }
 						},
 						"url": {
@@ -159,10 +161,14 @@
 					"request": {
 						"method": "GET",
 						"url": {
-							"raw": "{{base_cuentas}}/cuentas?clienteId={{clientId}}",
+							"raw": "{{base_cuentas}}/cuentas?clienteId={{clientId}}&page=0&size=20",
 							"host": ["{{base_cuentas}}"],
 							"path": ["cuentas"],
-							"query": [{ "key": "clienteId", "value": "{{clientId}}" }]
+							"query": [
+								{ "key": "clienteId", "value": "{{clientId}}" },
+								{ "key": "page", "value": "0" },
+								{ "key": "size", "value": "20" }
+							]
 						}
 					}
 				},
@@ -190,13 +196,30 @@
 					]
 				},
 				{
+					"name": "Actualizar cuenta",
+					"request": {
+						"method": "PUT",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"tipoCuenta\": \"CORRIENTE\",\n  \"estado\": \"ACTIVA\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{base_cuentas}}/cuentas/{{numeroCuenta}}",
+							"host": ["{{base_cuentas}}"],
+							"path": ["cuentas", "{{numeroCuenta}}"]
+						}
+					}
+				},
+				{
 					"name": "Crear movimiento",
 					"request": {
 						"method": "POST",
 						"header": [{ "key": "Content-Type", "value": "application/json" }],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"cuenta\": \"{{numeroCuenta}}\",\n  \"tipoMovimiento\": \"INGRESO\",\n  \"valor\": 100.00,\n  \"referencia\": \"TRANSFERENCIA-001\"\n}",
+							"raw": "{\n  \"cuenta\": \"{{numeroCuenta}}\",\n  \"tipoMovimiento\": \"INGRESO\",\n  \"valor\": 100.00,\n  \"fecha\": \"2026-10-23T10:00:00\",\n  \"referencia\": \"TRANSFERENCIA-001\"\n}",
 							"options": { "raw": { "language": "json" } }
 						},
 						"url": {
@@ -214,6 +237,8 @@
 									"pm.test('201 Created', function () { pm.response.to.have.status(201); });",
 									"var body = pm.response.json();",
 									"pm.collectionVariables.set('movimientoId', body.id);",
+									"pm.collectionVariables.set('movimientoFecha', body.fecha);",
+									"pm.collectionVariables.set('movimientoValor', body.valor);",
 									"pm.test('el tipo concuerda con el signo del valor', function () { pm.expect(body.tipoMovimiento).to.eql('INGRESO'); });",
 									"pm.test('el saldo resultante es el anterior mas el valor', function () {",
 									"    var saldoAntes = Number(pm.collectionVariables.get('saldoCuentaAntes'));",
@@ -295,10 +320,14 @@
 					"request": {
 						"method": "GET",
 						"url": {
-							"raw": "{{base_cuentas}}/movimientos?cuenta={{numeroCuenta}}",
+							"raw": "{{base_cuentas}}/movimientos?cuenta={{numeroCuenta}}&page=0&size=20",
 							"host": ["{{base_cuentas}}"],
 							"path": ["movimientos"],
-							"query": [{ "key": "cuenta", "value": "{{numeroCuenta}}" }]
+							"query": [
+								{ "key": "cuenta", "value": "{{numeroCuenta}}" },
+								{ "key": "page", "value": "0" },
+								{ "key": "size", "value": "20" }
+							]
 						}
 					}
 				},
@@ -320,7 +349,7 @@
 						"header": [{ "key": "Content-Type", "value": "application/json" }],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"referencia\": \"TRANSFERENCIA-001-CORREGIDA\"\n}",
+							"raw": "{\n  \"fecha\": \"{{movimientoFecha}}\",\n  \"referencia\": \"TRANSFERENCIA-001-CORREGIDA\",\n  \"valor\": {{movimientoValor}}\n}",
 							"options": { "raw": { "language": "json" } }
 						},
 						"url": {
@@ -398,7 +427,7 @@
 								"header": [{ "key": "Content-Type", "value": "application/json" }],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n  \"estado\": \"INACTIVA\"\n}",
+									"raw": "{\n  \"tipoCuenta\": \"AHORRO\",\n  \"estado\": \"INACTIVA\"\n}",
 									"options": { "raw": { "language": "json" } }
 								},
 								"url": {
@@ -560,6 +589,25 @@
 							]
 						}
 					]
+				},
+				{
+					"name": "Desactivar cuentas del cliente (masivo)",
+					"description": "Actualiza en bloque el estado de las cuentas activas del cliente. Va al final porque las desactiva todas.",
+					"request": {
+						"method": "PATCH",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"estado\": \"INACTIVA\"\n}",
+							"options": { "raw": { "language": "json" } }
+						},
+						"url": {
+							"raw": "{{base_cuentas}}/cuentas?clienteId={{clientId}}",
+							"host": ["{{base_cuentas}}"],
+							"path": ["cuentas"],
+							"query": [{ "key": "clienteId", "value": "{{clientId}}" }]
+						}
+					}
 				}
 			]
 		},
