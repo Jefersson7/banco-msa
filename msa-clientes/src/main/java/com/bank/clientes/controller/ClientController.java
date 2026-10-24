@@ -58,7 +58,7 @@ public class ClientController {
 
 	@PatchMapping("/{clientId}")
 	public ClientResponse updatePartially(@PathVariable String clientId,
-			@RequestBody PatchClientRequest request) {
+			@Valid @RequestBody PatchClientRequest request) {
 		return clientService.updatePartially(clientId, request);
 	}
 
