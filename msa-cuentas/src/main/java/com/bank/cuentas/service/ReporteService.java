@@ -1,6 +1,5 @@
 package com.bank.cuentas.service;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -77,12 +76,8 @@ public class ReporteService {
 		List<ReporteCuentaResponse> cuentas = new ArrayList<>();
 		for (List<Movimiento> movimientosDeCuenta : porCuenta.values()) {
 			Cuenta cuenta = movimientosDeCuenta.get(0).getCuenta();
-			BigDecimal neto = movimientosDeCuenta.stream()
-					.map(Movimiento::getValor)
-					.reduce(BigDecimal.ZERO, BigDecimal::add);
-			BigDecimal saldoAlInicio = cuenta.getSaldoActual().subtract(neto);
 			cuentas.add(new ReporteCuentaResponse(cuenta.getNumeroCuenta(), cuenta.getTipoCuenta(),
-					cuenta.getSaldoActual(), saldoAlInicio,
+					cuenta.getSaldoActual(),
 					movimientosDeCuenta.stream().map(MovementResponse::from).toList()));
 		}
 		return cuentas;

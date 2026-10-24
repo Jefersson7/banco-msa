@@ -10,6 +10,5 @@ public record ReporteCuentaResponse(
 		String numeroCuenta,
 		TipoCuenta tipoCuenta,
 		BigDecimal saldoActual,
-		BigDecimal saldoAlInicio,
 		List<MovementResponse> movimientos) {
 }
